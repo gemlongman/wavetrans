@@ -9,6 +9,7 @@
 /*                                                                    */
 /**********************************************************************/
 
+#include <math.h>
 #include "complex.h"
 
 /* Observatii asupra implementarii:
@@ -80,7 +81,7 @@
    Dimensiunea zonei de memorie pentru map trebuie sa fie cel putin
    2^n * sizeof(int).
  */
-void bin_reverse(int n, int *map) {
+void bit_reverse_map(int n, int *map) {
     int i, j, max = (1 << n) - 1;
     register int b, d;
 
@@ -107,12 +108,22 @@ void w_map(int n, t_complex *map) {
     int i, max = 1 << n;
     double N = max;
     double p = (double)((int)1 << COMPLEX_PRECISION);
+    double arg;
 
     for(i = 0; i < max; i++) {
-        arg = 2.0 * M_PI * i / N
+        arg = 2.0 * M_PI * i / N;
         map[i].r = p * cos(arg);
         map[i].i = p * sin(arg);
     }
 }
 
+/* Copiaza datele dintr-un vector in altul, in ordinea binar inversa.
 
+   n este numarul de biti al dimensiunii, iar map este o harta de indici
+   pentru ordinea binar inversata (eventual generata cu bit_reverse_map).
+ */
+void bit_reverse(int n, int *map, t_complex *src, t_complex *dst) {
+    int i, max = 1 << n;
+    for (i = 0; i < max; i++, src++, map++)
+        dst[*map] = *src;
+}
