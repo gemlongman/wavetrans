@@ -14,4 +14,7 @@
 typedef short t_s16;
 typedef long long t_s64;
 
+typedef unsigned int t_u32;
+typedef int t_s32;
+
 #endif
