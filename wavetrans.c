@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <math.h>
 
 #include "complex.h"
 #include "fft.h"
@@ -41,19 +42,44 @@ void dump_rev_map(int n, int *map) {
 #endif
 
 struct noise_reduction_context {
-    t_complex *noise_profile;
+    long double **noise;
+    long double alfa, beta;
 };
 
-void trans_noise_reduction(void *context, int n, t_complex *data) {
+void trans_noise_reduction(void *context, int n, int channel, t_complex *data) {
+    struct noise_reduction_context *ctx = context;
+    int size = 1 << n;
+    int i;
+    long double mod, est_mod;
+    long long coef;
+    
+    for(i = 0; i < size; i++) {
+        mod = sqrtl((long double)data[i].r * data[i].r +
+                (long double)data[i].i * data[i].i) /
+            (1LL << (2 * COMPLEX_PRECISION));
+        if(mod < 0.0000001) /* protectie la underflow */
+            continue;
+        if(ctx->alfa == 1) {
+            est_mod = mod - ctx->beta * ctx->noise[channel][i];
+            est_mod = est_mod > 0 ? est_mod : 0;
+        } else {
+            est_mod = powl(mod, ctx->alfa) -
+                ctx->beta * powl(ctx->noise[channel][i], ctx->alfa);
+            est_mod = est_mod > 0 ? powl(est_mod, 1 / ctx->alfa) : 0;
+        }
+        coef = (est_mod / mod) * (1 << COMPLEX_PRECISION);
+        data[i].r = data[i].r * coef / (1 << COMPLEX_PRECISION);
+        data[i].i = data[i].i * coef / (1 << COMPLEX_PRECISION);
+    }
 }
 
 struct equalizer_context {
 };
 
-void trans_equalizer(void *context, int n, t_complex *data) {
+void trans_equalizer(void *context, int n, int channel, t_complex *data) {
 }
 
-void trans_dummy(void *context, int n, t_complex *data) {
+void trans_dummy(void *context, int n, int channel, t_complex *data) {
 }
 
 struct global_context {
@@ -222,7 +248,6 @@ int main(int argc, char **argv) {
     FILE *out = stdout;
     FILE *noise_file = NULL;
     int frame_cnt = 1, frames;
-    t_complex **noise;
     t_complex *weight;
 
     /* Variabile de uz general */
@@ -244,7 +269,10 @@ int main(int argc, char **argv) {
     char *buf0, *buf1, *buf_pad, *buf_tmp;
     int buf1_len;
 
-    while((opt = getopt(argc, argv, "i:o:sfrned")) != -1) {
+    noise_reduction_context.alfa = 0.5;
+    noise_reduction_context.beta = 1;
+
+    while((opt = getopt(argc, argv, "i:o:sfrn:ed")) != -1) {
         switch(opt) {
         case 'i': /* Input file */
             if((in = fopen(optarg, "r")) == NULL) {
@@ -303,19 +331,23 @@ int main(int argc, char **argv) {
 
     if(do_sample_noise_level || trans_f == trans_noise_reduction) {
         /* Alocare buffere pentru mostrele de zgomot */
-        noise = (t_complex **)malloc(c.channels * sizeof(t_complex *));
-        assert(noise != NULL);
+        noise_reduction_context.noise =
+            (long double **)malloc(c.channels * sizeof(long double *));
+        assert(noise_reduction_context.noise != NULL);
         for(i = 0; i < c.channels; i++) {
-            noise[i] = (t_complex *)malloc(c.size * sizeof(t_complex));
-            assert(noise[i] != NULL);
+            noise_reduction_context.noise[i] =
+                (long double *)malloc(c.size * sizeof(long double));
+            assert(noise_reduction_context.noise[i] != NULL);
         }
         /* noise reprezinta o matrice cu componentele spectrale ale
            zgomotului pentru fiecare canal in parte */
     }
 
     if(do_sample_noise_level) {
+        init_fft_maps(&c);
         for(i = 0; i < c.channels; i++)
-            memset(noise[i], 0, c.size * sizeof(t_complex));
+            for(k = 0; k < c.size; k++)
+                noise_reduction_context.noise[i][k] = 0;
         fb_aux = malloc(c.size * sizeof(t_complex));
         assert(fb_aux != NULL);
         noise_fb_aux = malloc(c.size * sizeof(t_complex));
@@ -323,32 +355,47 @@ int main(int argc, char **argv) {
         buf0 = (char *)malloc(c.frame_len);
         assert(buf0 != NULL);
         for(j = 0; j < 10; j++) {
-            if(fread(buf0, 1, c.frame_len, in) < c.frame_len)
-                break;
+            status = fread(buf0, c.frame_len, 1, in);
+            assert(status);
             for(i = 0; i < c.channels; i++) {
                 c.complex_promote(c.size, c.interleave,
-                        buf0 + i * c.bytes_per_sample, fb_aux);
+                        buf0 + i * c.bytes_per_sample, noise_fb_aux);
+                bit_reverse(c.n, c.rev_map, noise_fb_aux, fb_aux);
+                dec_time_fft(c.n, c.w, fb_aux);
                 for(k = 0; k < c.size; k++) {
-                    fb_aux[k].r = cmodulus(fb_aux[k]);
-                    if(fb_aux[k].r > noise[i][k].r)
-                        noise[i][k].r = fb_aux[k].r;
+                    long double mod;
+
+                    mod = sqrtl((long double)fb_aux[k].r * fb_aux[k].r +
+                            (long double)fb_aux[k].i * fb_aux[k].i) /
+                        (1LL << (2 * COMPLEX_PRECISION));
+                    if(mod > noise_reduction_context.noise[i][k])
+                        noise_reduction_context.noise[i][k] = mod;
                 }
             }
         }
         for(i = 0; i < c.channels; i++) {
-            status = fwrite(noise[i], c.frame_len, 1, out);
+            status = fwrite(noise_reduction_context.noise[i],
+                    c.size * sizeof(long double), 1, out);
             assert(status);
-            free(noise[i]);
+            free(noise_reduction_context.noise[i]);
         }
-        free(noise);
+        free(noise_reduction_context.noise);
         free(fb_aux);
+        free(noise_fb_aux);
+        free_fft_maps(&c);
         fclose(in);
         fclose(out);
         return 0;
     }
 
     if(trans_f == trans_noise_reduction) {
-        // citire & verificare fisier
+        for(i = 0; i < c.channels; i++) {
+            status = fread(noise_reduction_context.noise[i],
+                    c.size * sizeof(long double), 1, noise_file);
+            assert(status);
+        }
+        fclose(noise_file);
+        fprintf(stderr, "Noise sample file OK\n");
     }
 
     if(no_wave_output) {
@@ -443,7 +490,7 @@ int main(int argc, char **argv) {
         
         bit_reverse(c.n, c.rev_map, fb1[i], fb_aux);
         dec_time_fft(c.n, c.w, fb_aux);
-        trans_f(trans_ctx, c.n, fb_aux);
+        trans_f(trans_ctx, c.n, i, fb_aux);
         bit_reverse(c.n, c.rev_map, fb_aux, fb1[i]);
         dec_time_ifft(c.n, c.w, fb1[i]);
     }
@@ -470,7 +517,7 @@ int main(int argc, char **argv) {
 
             bit_reverse(c.n, c.rev_map, fb1[i], fb_aux);
             dec_time_fft(c.n, c.w, fb_aux);
-            trans_f(trans_ctx, c.n, fb_aux);
+            trans_f(trans_ctx, c.n, i, fb_aux);
             bit_reverse(c.n, c.rev_map, fb_aux, fb1[i]);
             dec_time_ifft(c.n, c.w, fb1[i]);
 
@@ -498,7 +545,7 @@ int main(int argc, char **argv) {
 
             bit_reverse(c.n, c.rev_map, fb1[i], fb_aux);
             dec_time_fft(c.n, c.w, fb_aux);
-            trans_f(trans_ctx, c.n, fb_aux);
+            trans_f(trans_ctx, c.n, i, fb_aux);
             bit_reverse(c.n, c.rev_map, fb_aux, fb1[i]);
             dec_time_ifft(c.n, c.w, fb1[i]);
 
@@ -518,6 +565,11 @@ int main(int argc, char **argv) {
 
     
     /* Eliberare memorie */
+    if(trans_f == trans_noise_reduction) {
+        for(i = 0; i < c.channels; i++)
+            free(noise_reduction_context.noise[i]);
+        free(noise_reduction_context.noise);
+    }
     free_fft_maps(&c);
     free(weight);
     for(i = 0; i < 2 * c.channels; i++)

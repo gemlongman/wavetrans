@@ -3,6 +3,6 @@
 
 #include "complex.h"
 
-typedef void (*t_trans_f)(void *, int, t_complex *);
+typedef void (*t_trans_f)(void *, int, int, t_complex *);
 
 #endif
