@@ -1,0 +1,91 @@
+Prelucrarea Semnalelor - Tema 3 & 4
+===================================
+
+Descriere generala
+------------------
+
+Am incercat sa imbin toate cerintele din tema 3 si tema 4 intr-un singur
+program care sa indeplineasca toate functiile. Operatiile efectuate se
+pot alege prin parametri in linia de comanda. Programul rulat fara nici
+un parametru va furniza o lista a optiunilor disponibile.
+
+Functionalitatea implementata este cea de eliminare a zgomotului
+folosind procedeul de "scadere spectrala" si de aplicare a unui
+egalizator parametric.
+
+Compilare si rulare
+-------------------
+
+Programul a fost scris si testat pe o platforma GNU/Linux i686, folosind
+numai fisiere wave stereo cu esantioane pe 16 biti. Teoretic programul
+suporta fisiere wave cu esantioane de 8 sau 16 biti si orice numar de
+canale.
+
+Nu am facut teste pe alte arhitecturi decat x86 si probabil sansele sa
+functioneze sunt destul de mici. Exista functii dependente de
+proprietati ale masinii, cum ar fi endianess si dimensiunea cuvintelor.
+Portarea pe alte platforme ar presupune o modificare atenta a acestor
+functii.
+
+Compilarea se face cu un simplu "make". Pentru a vedea optiunile
+disponibile, programul poate fi rulat fara nici un parametru:
+
+$ ./wavetrans
+
+Pentru fisierul folosit ca date de intrare pentru egalizator exista un
+exemplu, equalizer.txt, in care este descris si formatul folosit.
+
+Detalii despre implementare
+---------------------------
+
+Am incercat pe cat posibil sa folosesc cat mai putin calcul in virgula
+mobila. Numerele complexe sunt reprezentate intr-o structura cu 2 membri
+de tip "long long". Cei 2 membri reprezinta partea reala, respectiv
+imaginara a numarului complex. In fiecare membru cel mai putin
+semnificativi 16 biti sunt folositi ca parte fractionara (practic lucrez
+in virgula fixa, pe intregi, virgula fiind pozitionata intre bitul de
+rang 15 si cel de rang 16). Descrierea structurii si cateva macrouri se
+gasesc in fisierul "complex.h".
+
+Transformarea Fourier Discreta (si transformarea inversa) necesare
+ambelor operatii de prelucrare (eliminare de zgomot si egalizare) sunt
+implementate folosind o varianta optimizata a algoritmului de decimare
+in timp. Detalii despre implementare si despre optimizarile efectuate se
+gasesc in comentariile din fisierul "fft.c".
+
+Fisierul "wave.c" contine functiile necesare conversiei esantioanelor
+din formatul intern wave in vectori de numere complexe si inapoi. Aceste
+functii sunt dependente de platforma deoarece presupun ca platforma este
+little endian, la fel ca wave (lucru valabil pentru x86 dar nevalabil in
+general).
+
+Tot in "wave.c" exista rutina de calcul al functiei pondere (weight)
+necesar pentru suprapunerea a 2 ferestre (functia D(n) descrisa in
+enuntul temei).
+
+Cea mai mare parte a codului se gaseste in fisierul principal
+("wavetrans.c"). Aici este codul pentru transformarile in domeniul
+frecventa, pentru codare / decodare riff si pentru impartirea pe
+ferestre (framing) si reasamblare folosind functia pondere.
+
+Functiile de transformare in domeniul frecventa au un antet generic,
+format dintr-un pointer spre un context specific (contine datele
+necesare transformarii respective, precalculate de alte functii),
+dimensiunea problemei, numarul canalului pe care se aplica
+transformarea si vectorul de numere complexe.
+
+Functiile de transformare pentru cele 2 operatii sunt
+trans_noise_reduction si respectiv trans_equalizer. Codul pentru
+initializarea contextului necesar transformarii de eliminare a
+zgomotului se gaseste in functia main intre liniile 417-460. Codul
+pentru initializarea contextului necesar transformarii de egalizator se
+gaseste in functia compute_equalizer_data.
+
+Codul pentru impartirea in ferestre si reasamplare se gaseste in functia
+main intre liniile 562-641. Inaintea acestui cod exista un comentariu
+care explica in detaliu algoritmul folosit.
+
+
+Radu Rendec
+352 C2
+                                                februarie 2005

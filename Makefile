@@ -1,6 +1,7 @@
-# CFLAGS = -O2 -Wall
-CFLAGS = -g -Wall
-LDFLAGS = -lm -lefence
+CFLAGS = -O2 -Wall
+#CFLAGS = -g -Wall
+LDFLAGS = -lm
+#LDFLAGS = -lm -lefence
 OBJS = fft.o wavetrans.o wave.o
 
 .PHONY: all clean
