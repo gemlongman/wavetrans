@@ -1,3 +1,5 @@
+#include <math.h>
+
 #include "wave.h"
 
 #define RANGE(x,min,max) ((x) < (min) ? (min) : ((x) > (max) ? (max) : (x)))
@@ -46,5 +48,16 @@ void complex_reduce_u8(int n, int interleave, t_complex *src, char *dst) {
         reduced = src->r / (1 << COMPLEX_PRECISION) + 128;
         /* FIXME: rotunjire atunci cand renunt la bitii de precizie */
         *(unsigned char *)dst = (unsigned char)RANGE(reduced, 0, 255);
+    }
+}
+
+void weight_map(int n, t_complex *data) {
+    int i, max = 1 << n;
+
+    double precision = 1 << COMPLEX_PRECISION;
+
+    for(i = 0; i < max; i++, data++) {
+        data->r = precision * (1 - cos(2.0 * M_PI * i / max)) / 2;
+        data->i = 0;
     }
 }

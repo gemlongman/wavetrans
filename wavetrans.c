@@ -7,6 +7,7 @@
 #include "fft.h"
 #include "wave.h"
 #include "wavetrans.h"
+#include "types.h"
 
 #define TEST
 
@@ -23,15 +24,16 @@ void dump(int n, t_complex *data) {
     double q = (double)(1 << COMPLEX_PRECISION);
     
     for(i = 0; i < n; i++, data++)
-        printf("(%lf, %lf)\n", (double)data->r / q, (double)data->i / q);
+        fprintf(stderr, "(%lf, %lf)\n", (double)data->r / q,
+                (double)data->i / q);
 }
 
 void dump_rev_map(int n, int *map) {
     int i;
     
     for(i = 1 << n; i; i--, map++)
-        printf("%d ", *map);
-    printf("\n");
+        fprintf(stderr, "%d ", *map);
+    fprintf(stderr, "\n");
 }
 #endif
 
@@ -40,9 +42,10 @@ void trans_dummy(void *context, int n, t_complex *data) {
 
 int main(int argc, char **argv) {
     /* Variabile pentru transformarea Fourier */
-    int n = 4096, size;
+    int n = 12, size;
     int *rev_map;
-    t_complex *w, *data1, *data2;
+    t_complex *w;
+    t_complex *weight;
 
     /* Variabile pentru formatul wave/pcm */
     t_riff_hdr riff_hdr;
@@ -51,6 +54,7 @@ int main(int argc, char **argv) {
 
     int channels;
     int interleave;
+    int bytes_per_sample;
 
     unsigned long wave_len = 0;
     t_chunk wave_fmt_chunk;
@@ -62,15 +66,24 @@ int main(int argc, char **argv) {
     FILE *in = stdin;
     FILE *out = stdout;
     unsigned long data_len = 0;
+    int frame_cnt = 1, frames;
 
     /* Variabile de uz general */
     int status;
+    int i, j;
 
     /* Variabile pentru transformarile aplicate */
     int out_wav = 1;
     t_trans_f trans_f = trans_dummy;
     void *trans_ctx = NULL;
     int frame_len;
+    char pad_value[4];
+
+    /* Buffer data */
+    t_complex **fb0, **fb1, **fb_tmp;
+    t_complex *fb_aux;
+    char *buf0, *buf1, *buf_pad, *buf_tmp;
+    int buf1_len;
 
     /* Citire header RIFF */
     status = fread(&riff_hdr, sizeof(t_riff_hdr), 1, in);
@@ -115,16 +128,21 @@ int main(int argc, char **argv) {
             fprintf(stderr, "%d channel(s), %d Hz\n", (int)wave_fmt.channels,
                     (int)wave_fmt.samples_per_sec);
 
+            /* Calcul interleave */
+            channels = wave_fmt.channels;
+            bytes_per_sample = wave_fmt.bits_per_sample / 8;
+            interleave = channels * bytes_per_sample;
+
             switch(wave_fmt.bits_per_sample) {
             case 8:
                 complex_promote = complex_promote_u8;
                 complex_reduce = complex_reduce_u8;
-                // padding value = (t_u8)128
+                *(unsigned char *)pad_value = 128;
                 break;
             case 16:
                 complex_promote = complex_promote_s16;
                 complex_reduce = complex_reduce_s16;
-                // padding value = (t_s16)0
+                *(t_s16 *)pad_value = 0;
                 break;
             default:
                 fprintf(stderr, "Unsupported sample type!\n");
@@ -149,22 +167,39 @@ int main(int argc, char **argv) {
 
     /* Pregatire memorie pentru tabele si buffere */
     size = 1 << n;
+    frame_len = interleave * size;
+
     rev_map = (int *)malloc(size * sizeof(int));
     assert(rev_map != NULL);
     w = (t_complex *)malloc(size * sizeof(t_complex));
     assert(w != NULL);
-    data1 = (t_complex *)malloc(size * sizeof(t_complex));
-    assert(data1 != NULL);
-    data2 = (t_complex *)malloc(size * sizeof(t_complex));
-    assert(data2 != NULL);
+    weight = (t_complex *)malloc(size * sizeof(t_complex));
+    assert(weight != NULL);
 
-    /* Calcul interleave */
-    channels = wave_fmt.channels;
-    interleave = channels * wave_fmt.bits_per_sample / 8;
+    fb0 = (t_complex **)malloc(2 * channels * sizeof(t_complex *));
+    assert(fb0 != NULL);
+    for(i = 0; i < 2 * channels; i++) {
+        fb0[i] = (t_complex *)malloc(size * sizeof(t_complex));
+        assert(fb0[i] != NULL);
+    }
+    fb1 = fb0 + channels;
+    fb_aux = (t_complex *)malloc(size * sizeof(t_complex));
+    assert(fb_aux != NULL);
+
+    buf0 = (char *)malloc(frame_len / 2);
+    assert(buf0 != NULL);
+    buf1 = (char *)malloc(frame_len / 2);
+    assert(buf1 != NULL);
+    buf_pad = (char *)malloc(frame_len / 2);
+    assert(buf_pad != NULL);
 
     /* Initializare tabele */
     bit_reverse_map(n, rev_map);
     w_map(n, w);
+    weight_map(n, weight);
+    for(i = size / 2 * channels, buf_tmp = buf_pad; i;
+            i--, buf_tmp += bytes_per_sample)
+        memcpy(buf_tmp, pad_value, bytes_per_sample);
 
     /* Output header riff, format wave si chunk date */
     /* FIXME calcul lungime date */
@@ -182,9 +217,6 @@ int main(int argc, char **argv) {
     tmp_chunk.size = wave_len;
     status = fwrite(&tmp_chunk, sizeof(t_chunk), 1, out);
     assert(status);
-
-    /* Pregatire transformari de framing */
-    frame_len = interleave * size;
 
 
     /* Aplicarea transformarilor.
@@ -211,7 +243,7 @@ int main(int argc, char **argv) {
        read(buf1);
        frame1 <- concat(buf0, buf1);
        transform(frame1);
-       do {
+       while(length(buf1) == 2^n / 2) {
            buf0 <- buf1;
            read(buf1); // padding cu 0 daca e < 2^n / 2
            frame0 <- frame1;
@@ -219,7 +251,7 @@ int main(int argc, char **argv) {
            transform(frame1);
            buf0 <- join(frame0, frame1);
            write(buf0);
-       } while(length(buf1) == 2^n / 2);
+       }
        if(length(buf1) > 0) {
            buf0 <- buf1;
            buf1 <- 0;
@@ -230,19 +262,96 @@ int main(int argc, char **argv) {
            write(buf0);
        } 
      */
+
+    frames = (wave_len + frame_len - 1) / frame_len;
+
+    memcpy(buf0, buf_pad, frame_len / 2);
+    buf1_len = fread(buf1, 1, frame_len / 2, in);
+    for(i = 0; i < channels; i++) {
+        complex_promote(size / 2, interleave,
+                buf0 + i * bytes_per_sample, fb1[i]);
+        complex_promote(size / 2, interleave,
+                buf1 + i * bytes_per_sample, fb1[i] + size / 2);
+        
+        bit_reverse(n, rev_map, fb1[i], fb_aux);
+        dec_time_fft(n, w, fb_aux);
+        trans_f(trans_ctx, n, fb_aux);
+        bit_reverse(n, rev_map, fb_aux, fb1[i]);
+        dec_time_ifft(n, w, fb1[i]);
+    }
+    while(buf1_len == frame_len / 2) {
+        if(!(frame_cnt % 10)) {
+            /* De fapt eu numar jumatati de frame-uri */
+            fprintf(stderr, "\rFrame %d/%d (%d%%)", frame_cnt / 2, frames,
+                    frame_cnt * 50 / frames);
+            fflush(stderr);
+        }
+        frame_cnt++;
+
+        buf_tmp = buf0; buf0 = buf1; buf1 = buf_tmp;
+        buf1_len = fread(buf1, 1, frame_len / 2, in);
+        if(buf1_len < frame_len / 2)
+            memcpy(buf1 + buf1_len, buf_pad, frame_len / 2 - buf1_len);
+        fb_tmp = fb0; fb0 = fb1; fb1 = fb_tmp;
+
+        for(i = 0; i < channels; i++) {
+            complex_promote(size / 2, interleave,
+                    buf0 + i * bytes_per_sample, fb1[i]);
+            complex_promote(size / 2, interleave,
+                    buf1 + i * bytes_per_sample, fb1[i] + size / 2);
+
+            bit_reverse(n, rev_map, fb1[i], fb_aux);
+            dec_time_fft(n, w, fb_aux);
+            trans_f(trans_ctx, n, fb_aux);
+            bit_reverse(n, rev_map, fb_aux, fb1[i]);
+            dec_time_ifft(n, w, fb1[i]);
+
+            for(j = 0; j < size / 2; j++) {
+                fb_aux[j].r =
+                    (fb0[i][size / 2 + j].r * weight[size / 2 + j].r +
+                     fb1[i][j].r * weight[j].r) / (1 << COMPLEX_PRECISION);
+            }
+            complex_reduce(size / 2, interleave, fb_aux,
+                    buf0 + i * bytes_per_sample);
+        }
+        status = fwrite(buf0, frame_len / 2, 1, out);
+        assert(status);
+    }
+    if(buf1_len) {
+        buf_tmp = buf0; buf0 = buf1; buf1 = buf_tmp;
+        memcpy(buf1, buf_pad, frame_len / 2);
+        fb_tmp = fb0; fb0 = fb1; fb1 = fb_tmp;
+
+        for(i = 0; i < channels; i++) {
+            complex_promote(size / 2, interleave,
+                    buf0 + i * bytes_per_sample, fb1[i]);
+            complex_promote(size / 2, interleave,
+                    buf1 + i * bytes_per_sample, fb1[i] + size / 2);
+
+            bit_reverse(n, rev_map, fb1[i], fb_aux);
+            dec_time_fft(n, w, fb_aux);
+            trans_f(trans_ctx, n, fb_aux);
+            bit_reverse(n, rev_map, fb_aux, fb1[i]);
+            dec_time_ifft(n, w, fb1[i]);
+
+            for(j = 0; j < size / 2; j++) {
+                fb_aux[j].r =
+                    (fb0[i][size / 2 + j].r * weight[size / 2 + j].r +
+                     fb1[i][j].r * weight[j].r) / (1 << COMPLEX_PRECISION);
+            }
+            complex_reduce(size / 2, interleave, fb_aux,
+                    buf0 + i * bytes_per_sample);
+        }
+        status = fwrite(buf0, buf1_len, 1, out);
+        assert(status);
+    }
+    fprintf(stderr, "\rFrame %d/%d (100%%)\n", frames, frames);
+    fflush(stderr);
+
     
-    bit_reverse(n, rev_map, test1, data1);
-    dec_time_fft(n, w, data1);
-    printf("Rezultat:\n");dump(size, data1);
-
-    bit_reverse(n, rev_map, data1, data2);
-    dec_time_ifft(n, w, data2);
-    printf("Inversa:\n");dump(size,data2);
-
+    /* Eliberare memorie */
     free(rev_map);
     free(w);
-    free(data1);
-    free(data2);
 
     return 0;
 }

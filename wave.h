@@ -15,15 +15,21 @@
 
 /* Structuri pentru formatul fisierelor WAV */
 
+#ifdef __GNUC__
+#define ATTRIBUTE_PACKED __attribute((packed))
+#else
+#define ATTRIBUTE_PACKED
+#endif
+
 typedef struct _chunk {
     char id[4];
     t_u32 size;
-} t_chunk;
+} ATTRIBUTE_PACKED t_chunk;
 
 typedef struct _riff_hdr {
     t_chunk chunk;
     char file_type[4];
-} t_riff_hdr;
+} ATTRIBUTE_PACKED t_riff_hdr;
 
 typedef struct _wave_format {
     t_s16 format_tag;
@@ -31,7 +37,7 @@ typedef struct _wave_format {
     t_s32 samples_per_sec;
     t_s32 bytes_per_sec;
     t_s16 block_align;
-} t_wave_format;
+} ATTRIBUTE_PACKED t_wave_format;
 
 typedef struct _wave_format_ex {
     t_s16 format_tag;
@@ -40,17 +46,18 @@ typedef struct _wave_format_ex {
     t_s32 bytes_per_sec;
     t_s16 block_align;
     t_s16 bits_per_sample;
-    t_s16 cb_size;
-} t_wave_format_ex;
+    /* t_s16 cb_size; */
+} ATTRIBUTE_PACKED t_wave_format_ex;
 
 #define WAVE_FORMAT_PCM 1
 
 typedef void (*t_complex_promote)(int, int, char *, t_complex *);
 typedef void (*t_complex_reduce)(int, int, t_complex *, char *);
 
-extern t_complex_promote complex_promote_s16;
-extern t_complex_reduce complex_reduce_s16;
-extern t_complex_promote complex_promote_u8;
-extern t_complex_reduce complex_reduce_u8;
+extern void complex_promote_s16(int, int, char *, t_complex *);
+extern void complex_reduce_s16(int, int, t_complex *, char *);
+extern void complex_promote_u8(int, int, char *, t_complex *);
+extern void complex_reduce_u8(int, int, t_complex *, char *);
 
+extern void weight_map(int, t_complex *);
 #endif
