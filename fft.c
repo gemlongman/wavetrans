@@ -189,3 +189,64 @@ void dec_time_fft(int n, t_complex *w, t_complex *data) {
         mul_k >>= 1;
     }
 }
+
+/* Calculeaza Transformata Fourier Discreta Inversa folosind algoritmul
+   de decimare in timp.
+   
+   Datele trebuie sa fie in ordine binar inversata.
+
+   Avand in vedere simetria relatiilor, algoritmul este aproape identic
+   cu cel pentru transformarea directa. Singurele diferente sunt
+   urmatoarele:
+   - Nu mai este necesara corectia de semn pentru exponentii vectorilor
+     W_N.
+   - Apare un factor de 1/2^n, care se distribuie in cate un factor 1/2
+     pentru fiecare iteratie.
+ */
+void dec_time_ifft(int n, t_complex *w, t_complex *data) {
+    int max = 1 << n;
+    int size = 1;
+    int mul_k = 1 << (n - 1);
+    int w0_exp, w1_exp, w1_exp_init = mul_k;
+    int i, j, k;
+
+    int w_exp_mask = max - 1;
+    t_complex q0, q1, w_pow;
+
+    for(i = 0; i < n; i++) {
+        /* Bucla pentru nivelul de "recursivitate" */
+        for(j = 0; j < max; j += size << 1) {
+            /* Bucla pentru functiile F_xx de pe nivelul curent; fiecare
+               pas reprezinta calculul unei singure functii F_xx de pe
+               nivelul curent
+             */
+            w0_exp = 0;
+            /* w1_exp = k_mul * size; */ /* produsul e constant */
+            w1_exp = w1_exp_init;
+
+            for(k = 0; k < size; k++) {
+                /* Indicele pentru componenta din functia F_xx curenta;
+                   coincide cu notatia din documentatie 
+                 */
+                w_pow = w[w0_exp & w_exp_mask];
+
+                q0.r = (data[j + k].r + cmul_r(data[j + size + k], w_pow)) / 2;
+                q0.i = (data[j + k].i + cmul_i(data[j + size + k], w_pow)) / 2;
+
+                w_pow = w[w1_exp & w_exp_mask];
+
+                q1.r = (data[j + k].r + cmul_r(data[j + size + k], w_pow)) / 2;
+                q1.i = (data[j + k].i + cmul_i(data[j + size + k], w_pow)) / 2;
+
+                data[j + k] = q0;
+                data[j + size + k] = q1;
+
+                /* Actualizare exponenti w */
+                w0_exp += mul_k;
+                w1_exp += mul_k;
+            }
+        }
+        size <<= 1;
+        mul_k >>= 1;
+    }
+}

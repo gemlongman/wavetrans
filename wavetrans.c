@@ -57,5 +57,9 @@ int main(int argc, char **argv) {
     dec_time_fft(n, w, data1);
     printf("Rezultat:\n");dump(size, data1);
 
+    bit_reverse(n, rev_map, data1, data2);
+    dec_time_ifft(n, w, data2);
+    printf("Inversa:\n");dump(size,data2);
+
     return 0;
 }
