@@ -283,6 +283,21 @@ void compute_equalizer_data(struct global_context *c,
     }
 }
 
+void print_help(char *arg) {
+    fprintf(stderr, "Usage: %s [options]\n\n"
+            "Options:\n"
+            "\t-i file\t\tRead input data from file (defaults to stdin)\n"
+            "\t-o file\t\tOutput data to file (defaults to stdout)\n"
+            "\t-s\t\tPerform noise spectrum sampling\n"
+            "\t-f n\t\tFFT size (in power of 2 i.e. 2^n) (defaults to 4096)\n"
+            "\t-r file\t\tPerform noise reduction with noise spectrum\n"
+            "\t\t\tfrom file\n"
+            "\t-e file\t\tPerform parametric equalization with equalizer\n"
+            "\t\t\tdata from file\n"
+            "\t-d\t\tDummy run (only FFT and iFFT transform)\n"
+            "\t-h\t\tThis help\n", arg);
+}
+
 int main(int argc, char **argv) {
     struct global_context c;
     /* Variabile pentru fluxul de date */
@@ -300,7 +315,7 @@ int main(int argc, char **argv) {
     /* Variabile pentru transformarile aplicate */
     int no_wave_output = 1;
     int do_sample_noise_level = 0;
-    t_trans_f trans_f = trans_dummy;
+    t_trans_f trans_f = NULL;
     void *trans_ctx = NULL;
 
     struct noise_reduction_context noise_reduction_context;
@@ -315,7 +330,7 @@ int main(int argc, char **argv) {
     noise_reduction_context.alfa = 1;
     noise_reduction_context.beta = 1;
 
-    while((opt = getopt(argc, argv, "i:o:sfrn:e:d")) != -1) {
+    while((opt = getopt(argc, argv, "i:o:sfr:e:dh")) != -1) {
         switch(opt) {
         case 'i': /* Input file */
             if((in = fopen(optarg, "r")) == NULL) {
@@ -343,18 +358,17 @@ int main(int argc, char **argv) {
             do_sample_noise_level = 1;
             break;
         case 'd': /* Dummy run (no transform) */
+            trans_f = trans_dummy;
             no_wave_output = 0;
             break;
         case 'r': /* Perform noise reduction */
-            no_wave_output = 0;
-            trans_f = trans_noise_reduction;
-            trans_ctx = &noise_reduction_context;
-            break;
-        case 'n': /* Noise level sample file */
             if((noise_file = fopen(optarg, "r")) == NULL) {
                 fprintf(stderr, "Failed opening %s\n", optarg);
                 return 17;
             }
+            no_wave_output = 0;
+            trans_f = trans_noise_reduction;
+            trans_ctx = &noise_reduction_context;
             break;
         case 'e': /* Perform Parametric Equalization */
             if((eq_file = fopen(optarg, "r")) == NULL) {
@@ -367,11 +381,19 @@ int main(int argc, char **argv) {
             trans_f = trans_equalizer;
             trans_ctx = &equalizer_context;
             break;
+        case 'h':
+            print_help(argv[0]);
+            return 0;
         case '?':
         case ':':
-            //FIXME: usage
+            print_help(argv[0]);
             return 20;
         }
+    }
+
+    if(!do_sample_noise_level && trans_f == NULL) {
+        print_help(argv[0]);
+        return 30;
     }
 
     global_context_init(&c);
@@ -459,6 +481,7 @@ int main(int argc, char **argv) {
         fclose(out);
         return 0;
     }
+
     weight = (t_complex *)malloc(c.size * sizeof(t_complex));
     assert(weight != NULL);
 
