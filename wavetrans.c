@@ -13,34 +13,6 @@
 
 extern char *optarg;
 
-#define TEST
-
-#ifdef TEST
-t_complex test1[8] = {
-    {0x70000, 0}, {0x50000, 0}, {0x60000, 0}, {0x90000, 0},
-    {0x70000, 0}, {0x50000, 0}, {0x60000, 0}, {0x90000, 0}};
-
-t_complex test2[4] = {
-    {0x70000, 0}, {0x50000, 0}, {0x60000, 0}, {0x90000, 0}};
-
-void dump(int n, t_complex *data) {
-    int i;
-    double q = (double)(1 << COMPLEX_PRECISION);
-    
-    for(i = 0; i < n; i++, data++)
-        fprintf(stderr, "(%lf, %lf)\n", (double)data->r / q,
-                (double)data->i / q);
-}
-
-void dump_rev_map(int n, int *map) {
-    int i;
-    
-    for(i = 1 << n; i; i--, map++)
-        fprintf(stderr, "%d ", *map);
-    fprintf(stderr, "\n");
-}
-#endif
-
 struct noise_reduction_context {
     long double **noise;
     long double alfa, beta;
@@ -73,10 +45,25 @@ void trans_noise_reduction(void *context, int n, int channel, t_complex *data) {
     }
 }
 
+#define MAX_EQ_CELLS 128
 struct equalizer_context {
+    double f[MAX_EQ_CELLS];
+    double a[MAX_EQ_CELLS];
+    double q[MAX_EQ_CELLS];
+    t_complex *data;
+
+    int ncells;
 };
 
 void trans_equalizer(void *context, int n, int channel, t_complex *data) {
+    struct equalizer_context *ctx = context;
+    int size = 1 << n;
+    int i;
+
+    for(i = 0; i < size; i++) {
+        data[i].r = data[i].r * ctx->data[i].r / (1 << COMPLEX_PRECISION);
+        data[i].i = data[i].i * ctx->data[i].r / (1 << COMPLEX_PRECISION);
+    }
 }
 
 void trans_dummy(void *context, int n, int channel, t_complex *data) {
@@ -241,12 +228,68 @@ void free_fft_maps(struct global_context *c) {
     free(c->w);
 }
 
+void read_eq_cells(struct equalizer_context *c, FILE *in) {
+    char buf[1024], *comment;
+    c->ncells = 0;
+    while(fgets(buf, sizeof(buf), in) != NULL) {
+        assert(strlen(buf) < sizeof(buf) - 1);
+        if((comment = strchr(buf, '#')) != NULL)
+            *comment = '\0';
+        if(sscanf(buf, "%lf%lf%lf", &c->f[c->ncells],
+                    &c->a[c->ncells], &c->q[c->ncells]) != 3)
+            continue;
+        if(++(c->ncells) >= MAX_EQ_CELLS)
+            break;
+    }
+    fprintf(stderr, "Successfully read %d equalizer cells\n", c->ncells);
+}
+
+void compute_equalizer_data(struct global_context *c,
+        struct equalizer_context *e) {
+    /* Calculeaza amplificarea pentru fiecare componenta spectrala
+       in functie de parametrii egalizatorului din vectorii f, a, q din
+       contextul e
+     */
+    int i, j;
+    double *adb;
+    double log10 = log(10);
+    double k;
+    double prod;
+    double adbi_k;
+
+    adb = alloca(e->ncells * sizeof(double));
+    /* Precalcul amplificare in decibeli pentru fiecare celula */
+    for(i = 0; i < e->ncells; i++)
+        adb[i] = 10 * log(e->a[i]) / log10;
+    /* Calcul amplificare pentru fiecare componenta spectrala */
+    for(j = 0; j < c->size; j++) {
+        /* Calculez frecventa reala k a componentei j in functie de
+           frecventa de esantionare
+         */
+        k = j <= c->size / 2 ?
+            (double)j / c->size * c->wave_fmt.samples_per_sec :
+            (double)(c->size - j) / c->size * c->wave_fmt.samples_per_sec;
+        /* Calculez amplificarea pe componenta j in functie de influenta
+           fiecarei celule
+         */
+        prod = 1;
+        for(i = 0; i < e->ncells; i++) {
+            adbi_k = adb[i] * exp(-fabs(log(k / e->f[i])) * e->q[i]);
+            prod *= pow(10, adbi_k / 10);
+        }
+        /* fprintf(stderr, "%lf\n", prod); */
+        e->data[j].r = prod * (1 << COMPLEX_PRECISION);
+        e->data[j].i = 0;
+    }
+}
+
 int main(int argc, char **argv) {
     struct global_context c;
     /* Variabile pentru fluxul de date */
     FILE *in = stdin;
     FILE *out = stdout;
     FILE *noise_file = NULL;
+    FILE *eq_file = NULL;
     int frame_cnt = 1, frames;
     t_complex *weight;
 
@@ -269,10 +312,10 @@ int main(int argc, char **argv) {
     char *buf0, *buf1, *buf_pad, *buf_tmp;
     int buf1_len;
 
-    noise_reduction_context.alfa = 0.5;
+    noise_reduction_context.alfa = 1;
     noise_reduction_context.beta = 1;
 
-    while((opt = getopt(argc, argv, "i:o:sfrn:ed")) != -1) {
+    while((opt = getopt(argc, argv, "i:o:sfrn:e:d")) != -1) {
         switch(opt) {
         case 'i': /* Input file */
             if((in = fopen(optarg, "r")) == NULL) {
@@ -314,6 +357,12 @@ int main(int argc, char **argv) {
             }
             break;
         case 'e': /* Perform Parametric Equalization */
+            if((eq_file = fopen(optarg, "r")) == NULL) {
+                fprintf(stderr, "Failed opening %s\n", optarg);
+                return 18;
+            }
+            read_eq_cells(&equalizer_context, eq_file);
+            fclose(eq_file);
             no_wave_output = 0;
             trans_f = trans_equalizer;
             trans_ctx = &equalizer_context;
@@ -396,6 +445,13 @@ int main(int argc, char **argv) {
         }
         fclose(noise_file);
         fprintf(stderr, "Noise sample file OK\n");
+    }
+
+    if(trans_f == trans_equalizer) {
+        equalizer_context.data =
+            (t_complex *)malloc(c.size * sizeof(t_complex));
+        assert(equalizer_context.data != NULL);
+        compute_equalizer_data(&c, &equalizer_context);
     }
 
     if(no_wave_output) {
@@ -569,6 +625,9 @@ int main(int argc, char **argv) {
         for(i = 0; i < c.channels; i++)
             free(noise_reduction_context.noise[i]);
         free(noise_reduction_context.noise);
+    }
+    if(trans_f == trans_equalizer) {
+        free(equalizer_context.data);
     }
     free_fft_maps(&c);
     free(weight);

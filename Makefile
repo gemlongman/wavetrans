@@ -9,5 +9,7 @@ all: wavetrans
 
 wavetrans: $(OBJS)
 
+test: fft.o test.o
+
 clean:
 	rm -f *~ *.o wavetrans
