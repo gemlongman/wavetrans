@@ -40,7 +40,7 @@ int main(int argc, char **argv) {
     bit_reverse_map(n, rev_map);
     w_map(n, w);
 
-    bit_reverse(8, rev_map, test1, data1);
+    bit_reverse(n, rev_map, test1, data1);
     dec_time_fft(n, w, data1);
     dump(8, data1);
 

@@ -82,10 +82,10 @@
    2^n * sizeof(int).
  */
 void bit_reverse_map(int n, int *map) {
-    int i, j, max = (1 << n) - 1;
+    int i, j, max = 1 << n;
     register int b, d;
 
-    for(j = 0; j < max; j--, map++) {
+    for(j = 0; j < max; j++, map++) {
         b = j;
         d = 0;
         for(i = 0; i < n; i++) {
@@ -134,7 +134,7 @@ void dec_time_fft(int n, t_complex *w, t_complex *data) {
     int max = 1 << n;
     int size = 1;
     int mul_k = 1 << (n - 1);
-    int w_exp;
+    int w0_exp, w1_exp, w1_exp_init = mul_k;
     int i, j, k;
 
     /* Masca va avea primii n biti setati si va fi folosita pentru
@@ -143,7 +143,7 @@ void dec_time_fft(int n, t_complex *w, t_complex *data) {
        periodice, de perioada 2^n)
      */
     int w_exp_mask = max - 1;
-    t_complex w_f1, w_pow;
+    t_complex q0, q1, w_pow;
 
     for(i = 0; i < n; i++) {
         /* Bucla pentru nivelul de "recursivitate" */
@@ -152,7 +152,10 @@ void dec_time_fft(int n, t_complex *w, t_complex *data) {
                pas reprezinta calculul unei singure functii F_xx de pe
                nivelul curent
              */
-            w_exp = 0;
+            w0_exp = 0;
+            /* w1_exp = k_mul * size; */ /* produsul e constant */
+            w1_exp = w1_exp_init;
+
             for(k = 0; k < size; k++) {
                 /* Indicele pentru componenta din functia F_xx curenta;
                    coincide cu notatia din documentatie 
@@ -164,27 +167,22 @@ void dec_time_fft(int n, t_complex *w, t_complex *data) {
                    Valoarea e de fapt negativa, asa ca fac o corectie dupa
                    ce calculez restul impartirii.
                  */
-                w_pow = w[max - (w_exp & w_exp_mask ? : max)];
+                w_pow = w[max - (w0_exp & w_exp_mask ? : max)];
 
-                /* Calculez F(k). Avand in vedere ca se calculeaza in paralel
-                   cele 2 ramuri, produsul W_N * F1 (identic pentru cele 2
-                   ramuri) se poate precalcula. Cum acest produs e singurul
-                   dependent de datele din a 2-a jumatate, ordinea este
-                   urmatoarea:
-                   - calcul produs W_N * F1
-                   - actualizare valoare din a 2-a jumatate
-                   - actualizare valoare din prima jumatate
-                 */
-                w_f1.r = cmul_r(data[j + k + size], w_pow);
-                w_f1.i = cmul_i(data[j + k + size], w_pow);
+                q0.r = data[j + k].r + cmul_r(data[j + size + k], w_pow);
+                q0.i = data[j + k].i + cmul_i(data[j + size + k], w_pow);
 
-                data[j + k + size].r = data[j + k].r - w_f1.r;
-                data[j + k + size].i = data[j + k].i - w_f1.i;
-                
-                data[j + k].r += w_f1.r;
-                data[j + k].i += w_f1.i;
-                
-                w_exp += mul_k;
+                w_pow = w[max - (w1_exp & w_exp_mask ? : max)];
+
+                q1.r = data[j + k].r + cmul_r(data[j + size + k], w_pow);
+                q1.i = data[j + k].i + cmul_i(data[j + size + k], w_pow);
+
+                data[j + k] = q0;
+                data[j + size + k] = q1;
+
+                /* Actualizare exponenti w */
+                w0_exp += mul_k;
+                w1_exp += mul_k;
             }
         }
         size <<= 1;
