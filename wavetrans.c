@@ -2,12 +2,15 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "complex.h"
 #include "fft.h"
 #include "wave.h"
 #include "wavetrans.h"
 #include "types.h"
+
+extern char *optarg;
 
 #define TEST
 
@@ -37,7 +40,23 @@ void dump_rev_map(int n, int *map) {
 }
 #endif
 
+struct noise_reduction_context {
+    t_complex *noise_profile;
+};
+
+void trans_noise_reduction(void *context, int n, t_complex *data) {
+}
+
+struct equalizer_context {
+};
+
+void trans_equalizer(void *context, int n, t_complex *data) {
+}
+
 void trans_dummy(void *context, int n, t_complex *data) {
+}
+
+void sample_noise_level(int n, FILE *in, FILE *out) {
 }
 
 int main(int argc, char **argv) {
@@ -65,26 +84,80 @@ int main(int argc, char **argv) {
     /* Variabile pentru fluxul de date */
     FILE *in = stdin;
     FILE *out = stdout;
+    FILE *noise_file = NULL;
     unsigned long data_len = 0;
     int frame_cnt = 1, frames;
 
     /* Variabile de uz general */
     int status;
-    int i, j;
+    int i, j, opt;
 
     /* Variabile pentru transformarile aplicate */
-    int out_wav = 1;
+    int no_wave_output = 1;
+    int do_sample_noise_level = 0;
     t_trans_f trans_f = trans_dummy;
     void *trans_ctx = NULL;
     int frame_len;
     char pad_value[4];
 
+    struct noise_reduction_context noise_reduction_context;
+    struct equalizer_context equalizer_context;
+
     /* Buffer data */
-    t_complex **fb0, **fb1, **fb_tmp;
+    t_complex **fb0, **fb1, **fb_tmp, **fb_base;
     t_complex *fb_aux;
     char *buf0, *buf1, *buf_pad, *buf_tmp;
     int buf1_len;
 
+    while((opt = getopt(argc, argv, "i:o:sfrne")) != -1) {
+        switch(opt) {
+        case 'i': /* Input file */
+            if((in = fopen(optarg, "r")) == NULL) {
+                fprintf(stderr, "Failed opening %s\n", optarg);
+                return 15;
+            }
+            break;
+        case 'o': /* Output file */
+            if((out = fopen(optarg, "w")) == NULL) {
+                fprintf(stderr, "Failed opening %s\n", optarg);
+                return 16;
+            }
+            break;
+        case 'f': /* FFT Size */
+            if(sscanf(optarg, "%d", &n) != 1) {
+                fprintf(stderr, "Invalid number for FFT Size\n");
+                return 21;
+            }
+            if(n < 8 || n > 16) {
+                fprintf(stderr, "FFT Size must be between 8 and 16\n");
+                return 22;
+            }
+            break;
+        case 's': /* Sample noise level */
+            do_sample_noise_level = 1;
+            break;
+        case 'r': /* Perform noise reduction */
+            no_wave_output = 0;
+            trans_f = trans_noise_reduction;
+            trans_ctx = &noise_reduction_context;
+            break;
+        case 'n': /* Noise level sample file */
+            if((noise_file = fopen(optarg, "r")) == NULL) {
+                fprintf(stderr, "Failed opening %s\n", optarg);
+                return 17;
+            }
+            break;
+        case 'e': /* Perform Parametric Equalization */
+            no_wave_output = 0;
+            trans_f = trans_equalizer;
+            trans_ctx = &equalizer_context;
+            break;
+        case '?':
+        case ':':
+            //FIXME: usage
+            return 20;
+        }
+    }
     /* Citire header RIFF */
     status = fread(&riff_hdr, sizeof(t_riff_hdr), 1, in);
     assert(status);
@@ -165,10 +238,26 @@ int main(int argc, char **argv) {
         data_len -= tmp_chunk.size;
     } while(1);
 
-    /* Pregatire memorie pentru tabele si buffere */
     size = 1 << n;
     frame_len = interleave * size;
 
+    if(do_sample_noise_level) {
+        sample_noise_level(n, in, out);
+        fclose(in);
+        fclose(out);
+        return 0;
+    }
+
+    if(trans_f == trans_noise_reduction) {
+        // citire & verificare fisier
+    }
+
+    if(no_wave_output) {
+        fclose(in);
+        fclose(out);
+        return 0;
+    }
+    /* Pregatire memorie pentru tabele si buffere */
     rev_map = (int *)malloc(size * sizeof(int));
     assert(rev_map != NULL);
     w = (t_complex *)malloc(size * sizeof(t_complex));
@@ -176,13 +265,14 @@ int main(int argc, char **argv) {
     weight = (t_complex *)malloc(size * sizeof(t_complex));
     assert(weight != NULL);
 
-    fb0 = (t_complex **)malloc(2 * channels * sizeof(t_complex *));
-    assert(fb0 != NULL);
+    fb_base = (t_complex **)malloc(2 * channels * sizeof(t_complex *));
+    assert(fb_base != NULL);
     for(i = 0; i < 2 * channels; i++) {
-        fb0[i] = (t_complex *)malloc(size * sizeof(t_complex));
+        fb_base[i] = (t_complex *)malloc(size * sizeof(t_complex));
         assert(fb0[i] != NULL);
     }
-    fb1 = fb0 + channels;
+    fb0 = fb_base;
+    fb1 = fb_base + channels;
     fb_aux = (t_complex *)malloc(size * sizeof(t_complex));
     assert(fb_aux != NULL);
 
@@ -352,6 +442,15 @@ int main(int argc, char **argv) {
     /* Eliberare memorie */
     free(rev_map);
     free(w);
+    free(weight_map);
+    for(i = 0; i < 2 * channels; i++)
+        free(fb_base[i]);
+    free(fb_base);
+    free(fb_aux);
+    free(buf0);
+    free(buf1);
 
+    fclose(in);
+    fclose(out);
     return 0;
 }
