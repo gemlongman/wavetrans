@@ -1,5 +1,7 @@
 #include "wave.h"
 
+#define RANGE(x,min,max) ((x) < (min) ? (min) : ((x) > (max) ? (max) : (x)))
+
 /* Extrage esantioane dintr-un vector de date (obtinut de exemplu dintr-un
    fisier wave) si le depune intr-un vector de numere complexe.
 
@@ -7,7 +9,7 @@
    dimensiunii), pentru a putea prelucra si ultima fereastra din fisier,
    care probabil nu e completa si va trebui umpluta cu 0.
  */
-void fft_promote_s16(int n, int interleave, char *src, t_complex *dst) {
+void complex_promote_s16(int n, int interleave, char *src, t_complex *dst) {
     int i;
 
     for(i = 0; i < n; i++, src += interleave, dst++) {
@@ -16,15 +18,18 @@ void fft_promote_s16(int n, int interleave, char *src, t_complex *dst) {
     }
 }
 
-void fft_reduce_s16(int n, int interleave, t_complex *src, char *dst) {
+void complex_reduce_s16(int n, int interleave, t_complex *src, char *dst) {
     int i;
+    t_s64 reduced;
 
-    for(i = 0; i < n; i++, src++, dst += interleave)
-        WAVE_MACHINE_2_s16(dst, (t_s16)(src->r / (1 << COMPLEX_PRECISION)));
-    /* FIXME: rotunjire atunci cand renunt la bitii de precizie */
+    for(i = 0; i < n; i++, src++, dst += interleave) {
+        reduced = src->r / (1 << COMPLEX_PRECISION);
+        /* FIXME: rotunjire atunci cand renunt la bitii de precizie */
+        WAVE_MACHINE_2_s16(dst, (t_s16)RANGE(reduced, -32768, 32767));
+    }
 }
 
-void fft_promote_u8(int n, int interleave, char *src, t_complex *dst) {
+void complex_promote_u8(int n, int interleave, char *src, t_complex *dst) {
     int i;
 
     for(i = 0; i < n; i++, src += interleave, dst++) {
@@ -33,9 +38,13 @@ void fft_promote_u8(int n, int interleave, char *src, t_complex *dst) {
     }
 }
 
-void fft_reduce_u8(int n, int interleave, t_complex *src, char *dst) {
+void complex_reduce_u8(int n, int interleave, t_complex *src, char *dst) {
     int i;
+    t_s64 reduced;
 
-    for(i = 0; i < n; i++, src++, dst += interleave)
-        *(unsigned char *)src = 0; //FIXME
+    for(i = 0; i < n; i++, src++, dst += interleave) {
+        reduced = src->r / (1 << COMPLEX_PRECISION) + 128;
+        /* FIXME: rotunjire atunci cand renunt la bitii de precizie */
+        *(unsigned char *)dst = (unsigned char)RANGE(reduced, 0, 255);
+    }
 }
