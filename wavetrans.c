@@ -9,7 +9,11 @@
 
 #ifdef TEST
 t_complex test1[8] = {
-    {7, 0}, {5, 0}, {6, 0}, {9, 0}, {7, 0}, {5, 0}, {6, 0}, {9, 0}};
+    {0x70000, 0}, {0x50000, 0}, {0x60000, 0}, {0x90000, 0},
+    {0x70000, 0}, {0x50000, 0}, {0x60000, 0}, {0x90000, 0}};
+
+t_complex test2[4] = {
+    {0x70000, 0}, {0x50000, 0}, {0x60000, 0}, {0x90000, 0}};
 
 void dump(int n, t_complex *data) {
     int i;
@@ -17,6 +21,14 @@ void dump(int n, t_complex *data) {
     
     for(i = 0; i < n; i++, data++)
         printf("(%lf, %lf)\n", (double)data->r / q, (double)data->i / q);
+}
+
+void dump_rev_map(int n, int *map) {
+    int i;
+    
+    for(i = 1 << n; i; i--, map++)
+        printf("%d ", *map);
+    printf("\n");
 }
 #endif
 
@@ -38,11 +50,12 @@ int main(int argc, char **argv) {
     assert(data2 != NULL);
 
     bit_reverse_map(n, rev_map);
+    dump_rev_map(n, rev_map);
     w_map(n, w);
 
     bit_reverse(n, rev_map, test1, data1);
     dec_time_fft(n, w, data1);
-    dump(8, data1);
+    printf("Rezultat:\n");dump(size, data1);
 
     return 0;
 }
