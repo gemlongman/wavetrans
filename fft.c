@@ -9,6 +9,7 @@
 /*                                                                    */
 /**********************************************************************/
 
+#include "complex.h"
 
 /* Observatii asupra implementarii:
 
@@ -87,9 +88,31 @@ void bin_reverse(int n, int *map) {
         b = j;
         d = 0;
         for(i = 0; i < n; i++) {
-            d = (d << 1) | b & 1;
+            d = (d << 1) | (b & 1);
             b >>= 1;
         }
         *map = d;
     }
 }
+
+/* Calculeaza tabela cu vectorii W, unde W_N ^ k = exp(2 * PI * k / N).
+
+   n este numarul de biti al dimensiunii, iar map este vectorul de
+   valori complexe care va fi generat.
+
+   Dimensiunea zonei de memorie pentru map trebuie sa fie cel putin
+   2^n * sizeof(t_complex).
+ */
+void w_map(int n, t_complex *map) {
+    int i, max = 1 << n;
+    double N = max;
+    double p = (double)((int)1 << COMPLEX_PRECISION);
+
+    for(i = 0; i < max; i++) {
+        arg = 2.0 * M_PI * i / N
+        map[i].r = p * cos(arg);
+        map[i].i = p * sin(arg);
+    }
+}
+
+
