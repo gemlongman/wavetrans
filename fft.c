@@ -20,12 +20,13 @@
 
 /**********************************************************************/
 /*                                                                    */
-/* Implementarea Transformatei Fourier Rapide si a Transformatei      */
+/* Implementarea Transformatei Fourier Rapide si a Transformatei
+/* 快速傅里叶变换的实现和测试      */
 /* Fourier Rapide Inverse folosind algoritmul de decimare in timp.    */
-/*                                                                    */
-/* Fisierul mai contine si functiile auxiliare necesare implementarii */
-/* algoritmului, cum ar fi precalcularea vectorilor W_N si a tabelei  */
-/* de mapare pentru ordinea binar inversata.                          */
+/* 利用快速傅立叶算法反在提姆的抽取     */
+/* Fisierul mai contine si functiile auxiliare necesare implementarii 包含文件和必要的辅助功能，实施 */
+/* algoritmului, cum ar fi precalcularea vectorilor W_N si a tabelei  向量的算法，如通过微积分基础课_ N和W tabelei */
+/* de mapare pentru ordinea binar inversata.   二进制顺序映射的逆转。                       */
 /*                                                                    */
 /**********************************************************************/
 
@@ -33,13 +34,14 @@
 #include "complex.h"
 
 /* Observatii asupra implementarii:
-
+    对实施的观察
    Pentru calculul componentelor spectrale F(k) este suficient un
    vector de numere complexe, care va fi initializat cu functiile
    cele mai granulare. La fiecare iteratie va fi generat nivelul
    urmator, pe care numarul functiilor se injumatateste si domeniul
    lor de definitie se dubleaza.
-
+    构件计算谱f（k）是足够的数字向量的复杂的功能，将初始化最造粒。在每一代如何将产生的水平下一步，它的功能是一半的数量和范围他们定义加倍
+    构件计算谱f（k）是一个数字向量足够复杂的功能，将初始化的造粒。在每一代如何将产生一个新的水平，它的功能的数量和范围的定义njumatateste加倍。
    OBS 1
    -----
    
@@ -48,6 +50,7 @@
    auxiliare pot fi reprezentate concatenat. Un exemplu pentru N=8,
    la care pe fiecare nivel am reprezentat functiile auxiliare de
    la un pas al algoritmului:
+   是我们注意到，每一层上的相同数量的总频谱分量的值，因此，可以用oncatenat辅助功能。为N = 8，每一层的功能iliare我代表在一步控制算法
 
    +-------+-------+-------+-------+-------+-------+-------+-------+
    |   0   |   1   |   2   |   3   |   4   |   5   |   6   |   7   |
@@ -65,29 +68,23 @@
    OBS 2
    -----
 
-   Functiile F cele mai granulare sunt definite doar in punctul 0,
-   prin urmare suma va avea un singur termen, iar vectorul W fa fi
-   cel unitar. Cu alte cuvinte, valoarea ei va fi egala cu o valoare
-   din domeniul timp.
+Functiile F cele mai granulare sunt definite doar in punctul 0,prin urmare suma va avea un singur termen, iar vectorul W fa fi cel unitar. Cu alte cuvinte, valoarea ei va fi egala cu o valoare din domeniul timp.
+函数f定义最颗粒只在0点，因此将有一个量的限制，和W是向量做单一。换句话说，它的价值也会与时间域的值。
 
-   Mai mult, valoarea corespunzatoare este componenta binar inversata,
-   adica lui F_011 (de pe componenta 011(b) = 3) ii va corespunde
-   esantionul de pe pozitia 110(b) = 6. Prin urmare vectorul de valori
-   complexe poate fi initializat cu datele de intrare in ordine binar
-   inversata.
-
+Mai mult, valoarea corespunzatoare este componenta binar inversata,adica lui F_011 (de pe componenta 011(b) = 3) ii va corespunde esantionul de pe pozitia 110(b) = 6. Prin urmare vectorul de valori complexe poate fi initializat cu datele de intrare in ordine binar inversata.
+更多的价值，正确的组件是二进制的，我的意思是他的（F _ 011 011成分（B）= 3）将样本110对应位置（B）= 6。因此，复杂的值初始化向量可以用二进制输入数据的顺序。
 
    OBS 3
    -----
 
-   Vectorul de valori complexe poate fi suprascris la fiecare iteratie.
-   Notam vectorul cu V. Pentru a calcula F(0) este necesar F_0(0) si
-   F_1(0), deci conform reprezentarii, in V(0) vom inscrie o valoare
-   calculata folosind V(0) si V(4). F(4) foloseste tot F_0(0) si F_1(0),
-   deci pentru V(4) se folosesc tot V(0) si V(4). In plus, V(0) si V(4)
-   nu mai sunt necesare pentru nici o alta valoare. Rezulta deci ca
-   vectorul V poate fi suprascris calculand perechi de cate 2
-   componente.
+Vectorul de valori complexe poate fi suprascris la fiecare iteratie.
+Notam vectorul cu V. Pentru a calcula F(0) este necesar F_0(0) si
+F_1(0), deci conform reprezentarii, in V(0) vom inscrie o valoare
+calculata folosind V(0) si V(4). F(4) foloseste tot F_0(0) si F_1(0),
+deci pentru V(4) se folosesc tot V(0) si V(4). In plus, V(0) si V(4)
+nu mai sunt necesare pentru nici o alta valoare. Rezulta deci ca
+vectorul V poate fi suprascris calculand perechi de cate 2
+componente.
  */
 
 /* Calculeaza o tabela de mapare care, pentru fiecare indice, contine
