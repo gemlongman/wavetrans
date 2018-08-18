@@ -24,12 +24,12 @@
 
 #define RANGE(x,min,max) ((x) < (min) ? (min) : ((x) > (max) ? (max) : (x)))
 
-/* Extrage esantioane dintr-un vector de date (obtinut de exemplu dintr-un
-   fisier wave) si le depune intr-un vector de numere complexe.
+/* Extrage esantioane dintr-un vector de date (obtinut de exemplu dintr-un fisier wave) si le depune intr-un vector de numere complexe.
 
-   n reprezinta numarul de esantioane (si nu numarul de biti al
-   dimensiunii), pentru a putea prelucra si ultima fereastra din fisier,
-   care probabil nu e completa si va trebui umpluta cu 0.
+   n reprezinta numarul de esantioane (si nu numarul de biti al dimensiunii), pentru a putea prelucra si ultima fereastra din fisier, care probabil nu e completa si va trebui umpluta cu 0.
+   提取的样品从一个矢量数据（例如，从一个文件得到波），他们将在一个复杂的数字向量。
+
+    n是样本数（而不是字节数的大小），和最后的窗口可以处理的文件，这可能将是不完整的，充满了0。
  */
 void complex_promote_s16(int n, int interleave, char *src, t_complex *dst) {
     int i;
@@ -46,7 +46,7 @@ void complex_reduce_s16(int n, int interleave, t_complex *src, char *dst) {
 
     for(i = 0; i < n; i++, src++, dst += interleave) {
         reduced = src->r / (1 << COMPLEX_PRECISION);
-        /* FIXME: rotunjire atunci cand renunt la bitii de precizie */
+        /* FIXME: rotunjire atunci cand renunt la bitii de precizie 当我放弃舍入位精度 */
         WAVE_MACHINE_2_s16(dst, (t_s16)RANGE(reduced, -32768, 32767));
     }
 }
@@ -66,7 +66,7 @@ void complex_reduce_u8(int n, int interleave, t_complex *src, char *dst) {
 
     for(i = 0; i < n; i++, src++, dst += interleave) {
         reduced = src->r / (1 << COMPLEX_PRECISION) + 128;
-        /* FIXME: rotunjire atunci cand renunt la bitii de precizie */
+        /* FIXME: rotunjire atunci cand renunt la bitii de precizie 当我放弃舍入位精度 */
         *(unsigned char *)dst = (unsigned char)RANGE(reduced, 0, 255);
     }
 }

@@ -24,16 +24,16 @@
 #include "types.h"
 #include "complex.h"
 
-/* FIXME urmatoarele sunt valabile doar pe i386 */
+/* FIXME urmatoarele sunt valabile doar pe i386 接下来的fixme仅在i386 */
 
-/* Obtine un t_s16 din continutul de la adresa indicata de p */
+/* Obtine un t_s16 din continutul de la adresa indicata de p 得到一个_ T S16的目标地址P含量*/
 #define WAVE_s16_2_MACHINE(p) (*(t_s16 *)(p))
 
-/* Depune un t_s16 la adresa indicata de p */
+/* Depune un t_s16 la adresa indicata de p 提出一个目标地址_ S16 T P */
 #define WAVE_MACHINE_2_s16(p,x) (*(t_s16 *)(p) = (x))
 
 
-/* Structuri pentru formatul fisierelor WAV */
+/* Structuri pentru formatul fisierelor WAV WAV格式文件的结构*/
 
 #ifdef __GNUC__
 #define ATTRIBUTE_PACKED __attribute((packed))

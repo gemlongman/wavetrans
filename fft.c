@@ -85,18 +85,21 @@ deci pentru V(4) se folosesc tot V(0) si V(4). In plus, V(0) si V(4)
 nu mai sunt necesare pentru nici o alta valoare. Rezulta deci ca
 vectorul V poate fi suprascris calculand perechi de cate 2
 componente.
+复杂的矢量值可在每一代如何重写。
+
+本文用矢量来计算V。F（0）是必要的，_ F 0（0）_ F 1（0），所以根据你的表现，在我们得分值（0）计算采用V V（0）和（4）。（4）使用所有的F F F _ 0（0）和（0，1）_所以对V（4）使用所有的V（0）和V（4）。此外，V（0）和V（4）不需任何其他值。所以导致向量v可以重写计算对两组件。
  */
 
 /* Calculeaza o tabela de mapare care, pentru fiecare indice, contine
    indicele cu valoarea binar inversata. De exemplu daca dimensiunea
    tabelei este N=8 (3 biti), pentru componenta 3 = 011(b) va corespunde
    valoarea 6 = 110(b).
-
-   n este numarul de biti al dimensiunii, iar map este vectorul de
-   mapare.
-
+一个映射表的计算，为每一个指标，指标值包含二进制反向。例如，如果tabelei大小是n = 8（3位），组分3 011（B = 6 = 110）对应的值（B）
+   n este numarul de biti al dimensiunii, iar map este vectorul de mapare.
+n是大小的字节数，地图是矢量图。
    Dimensiunea zonei de memorie pentru map trebuie sa fie cel putin
    2^n * sizeof(int).
+   存储区的大小必须至少为MAP 2 ^ n×sizeof（int）
  */
 void bit_reverse_map(int n, int *map) {
     int i, j, max = 1 << n;
@@ -115,11 +118,12 @@ void bit_reverse_map(int n, int *map) {
 
 /* Calculeaza tabela cu vectorii W, unde W_N ^ k = exp(2 * PI * k / N).
 
-   n este numarul de biti al dimensiunii, iar map este vectorul de
-   valori complexe care va fi generat.
+   n este numarul de biti al dimensiunii, iar map este vectorul de  valori complexe care va fi generat.
 
-   Dimensiunea zonei de memorie pentru map trebuie sa fie cel putin
-   2^n * sizeof(t_complex).
+   Dimensiunea zonei de memorie pentru map trebuie sa fie cel putin  2^n * sizeof(t_complex).
+   计算板_向量W，其中W N和K = exp（2 * pi * k／n）。
+我的号码是字节大小的地图是矢量，将产生复杂的值。
+存储区的大小必须至少为MAP（2 ^ N×T sizeof _复杂）
  */
 void w_map(int n, t_complex *map) {
     int i, max = 1 << n;
@@ -136,8 +140,9 @@ void w_map(int n, t_complex *map) {
 
 /* Copiaza datele dintr-un vector in altul, in ordinea binar inversa.
 
-   n este numarul de biti al dimensiunii, iar map este o harta de indici
-   pentru ordinea binar inversata (eventual generata cu bit_reverse_map).
+   n este numarul de biti al dimensiunii, iar map este o harta de indici pentru ordinea binar inversata (eventual generata cu bit_reverse_map).
+   复制数据从一个到另一个二进制向量，反向顺序。
+我的号码是字节大小的地图，地图是二进制指数（可能产生的秩序与_溢位_ MAP）。
  */
 void bit_reverse(int n, int *map, t_complex *src, t_complex *dst) {
     int i, max = 1 << n;
@@ -154,35 +159,30 @@ void dec_time_fft(int n, t_complex *w, t_complex *data) {
     int w0_exp, w1_exp, w1_exp_init = mul_k;
     int i, j, k;
 
-    /* Masca va avea primii n biti setati si va fi folosita pentru
-       calculul rapid al restului impartirii la 2^n, necesar normalizarii
-       indexului in tabela de puteri ale lui W_N (puterile lui W_N sunt
-       periodice, de perioada 2^n)
+    /* Masca va avea primii n biti setati si va fi folosita pentru calculul rapid al restului impartirii la 2^n, necesar normalizarii indexului in tabela de puteri ale lui W_N (puterile lui W_N sunt  periodice, de perioada 2^n)
+    将前N位掩码设置将用于快速计算，其余的四分normalizarii 2 ^ N，必要的权力指数在积分榜_ N（W W N _他的力量是周期性的，周期2 ^ n）
      */
     int w_exp_mask = max - 1;
     t_complex q0, q1, w_pow;
 
     for(i = 0; i < n; i++) {
-        /* Bucla pentru nivelul de "recursivitate" */
+        /* Bucla pentru nivelul de "recursivitate" “recursivitate复发性的环的水平”*/
         for(j = 0; j < max; j += size << 1) {
-            /* Bucla pentru functiile F_xx de pe nivelul curent; fiecare
-               pas reprezinta calculul unei singure functii F_xx de pe
-               nivelul curent
+            /* Bucla pentru functiile F_xx de pe nivelul curent; fiecare pas reprezinta calculul unei singure functii F_xx de pe nivelul curent 0 _ F环的功能在目前的水平；每一步计算的函数f是一个水平面上的电流_ XX
              */
             w0_exp = 0;
-            /* w1_exp = k_mul * size; */ /* produsul e constant */
+            /* w1_exp = k_mul * size; */ /* produsul e constant 该产品是稳定的 */
             w1_exp = w1_exp_init;
 
             for(k = 0; k < size; k++) {
-                /* Indicele pentru componenta din functia F_xx curenta;
-                   coincide cu notatia din documentatie 
+                /* Indicele pentru componenta din functia F_xx curenta; coincide cu notatia din documentatie  指数函数f的20 _组件的文件与当前的符号；
                  */
 
-                /* Calcul exponent pentru W_N si extragerea valorii
-                   pentru puterea lui W_N din tabela precalculata.
+                /* Calcul exponent pentru W_N si extragerea valorii pentru puterea lui W_N din tabela precalculata.
                    
-                   Valoarea e de fapt negativa, asa ca fac o corectie dupa
-                   ce calculez restul impartirii.
+                   Valoarea e de fapt negativa, asa ca fac o corectie dupa ce calculez restul impartirii.
+                   指数的计算值_ N和W W _挖掘他的力量不precalculata的比分。
+                   实际上是负价值，所以做一个计算校正后剩余的分割。
                  */
                 w_pow = w[max - (w0_exp & w_exp_mask ? : max)];
 
@@ -209,16 +209,21 @@ void dec_time_fft(int n, t_complex *w, t_complex *data) {
 
 /* Calculeaza Transformata Fourier Discreta Inversa folosind algoritmul
    de decimare in timp.
-   
+   离散傅里叶变换的逆算法计算抽取的时间。
    Datele trebuie sa fie in ordine binar inversata.
 
-   Avand in vedere simetria relatiilor, algoritmul este aproape identic
-   cu cel pentru transformarea directa. Singurele diferente sunt
+   Avand in vedere simetria relatiilor, algoritmul este aproape identic cu cel pentru transformarea directa. Singurele diferente sunt
    urmatoarele:
    - Nu mai este necesara corectia de semn pentru exponentii vectorilor
      W_N.
    - Apare un factor de 1/2^n, care se distribuie in cate un factor 1/2
      pentru fiecare iteratie.
+     考虑到算法的对称关系，几乎是相同的，直接的转换。唯一的区别是
+    以下：
+
+    你不必要的修正exponentii矢量标志    _ N W。
+
+    出现一个1 / 2和N，其中分布在一个因子1 / 2   每一代如何。
  */
 void dec_time_ifft(int n, t_complex *w, t_complex *data) {
     int max = 1 << n;
@@ -231,19 +236,16 @@ void dec_time_ifft(int n, t_complex *w, t_complex *data) {
     t_complex q0, q1, w_pow;
 
     for(i = 0; i < n; i++) {
-        /* Bucla pentru nivelul de "recursivitate" */
+        /* Bucla pentru nivelul de "recursivitate" “recursivitate环的水平” */
         for(j = 0; j < max; j += size << 1) {
-            /* Bucla pentru functiile F_xx de pe nivelul curent; fiecare
-               pas reprezinta calculul unei singure functii F_xx de pe
-               nivelul curent
+            /* Bucla pentru functiile F_xx de pe nivelul curent; fiecare pas reprezinta calculul unei singure functii F_xx de pe nivelul curent 20 _ F环的功能在目前的水平；每一步计算的函数f是一个水平面上的电流_ XX
              */
             w0_exp = 0;
-            /* w1_exp = k_mul * size; */ /* produsul e constant */
+            /* w1_exp = k_mul * size; */ /* produsul e constant 该产品是稳定的 */
             w1_exp = w1_exp_init;
 
             for(k = 0; k < size; k++) {
-                /* Indicele pentru componenta din functia F_xx curenta;
-                   coincide cu notatia din documentatie 
+                /* Indicele pentru componenta din functia F_xx curenta; coincide cu notatia din documentatie 指数函数f的20 _组件的文件与当前的符号；
                  */
                 w_pow = w[w0_exp & w_exp_mask];
 
@@ -258,7 +260,7 @@ void dec_time_ifft(int n, t_complex *w, t_complex *data) {
                 data[j + k] = q0;
                 data[j + size + k] = q1;
 
-                /* Actualizare exponenti w */
+                /* Actualizare exponenti w 更新exponenti W */
                 w0_exp += mul_k;
                 w1_exp += mul_k;
             }

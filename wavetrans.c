@@ -49,7 +49,7 @@ void trans_noise_reduction(void *context, int n, int channel, t_complex *data) {
         mod = sqrtl((long double)data[i].r * data[i].r +
                 (long double)data[i].i * data[i].i) /
             (1LL << (2 * COMPLEX_PRECISION));
-        if(mod < 0.0000001) /* protectie la underflow */
+        if(mod < 0.0000001) /* protectie la underflow 下溢保护*/
             continue;
         if(ctx->alfa == 1) {
             est_mod = mod - ctx->beta * ctx->noise[channel][i];
@@ -90,12 +90,12 @@ void trans_dummy(void *context, int n, int channel, t_complex *data) {
 }
 
 struct global_context {
-    /* Variabile pentru transformarea Fourier */
+    /* Variabile pentru transformarea Fourier 傅里叶变换 */
     int n, size;
     int *rev_map;
     t_complex *w;
 
-    /* Variabile pentru formatul wave/pcm */
+    /* Variabile pentru formatul wave/pcm 波/ PCM格式 */
     int channels;
     int interleave;
     int bytes_per_sample;
@@ -140,7 +140,7 @@ int riff_read(struct global_context *c, FILE *in) {
 
     data_len = c->riff_hdr.chunk.size;
 
-    /* Restul datelor sunt chunk-uri specifice wave */
+    /* Restul datelor sunt chunk-uri specifice wave 其余的数据块是站点特定波 */
     do {
         assert(data_len >= sizeof(t_chunk));
         status = fread(&tmp_chunk, sizeof(t_chunk), 1, in);
@@ -197,7 +197,7 @@ int riff_read(struct global_context *c, FILE *in) {
             break;
         }
 
-        /* Sar peste orice alt fel de chunk (pe care nu il inteleg) */
+        /* Sar peste orice alt fel de chunk (pe care nu il inteleg) 跳过任何一块的（我不明白）*/
         assert(data_len >= tmp_chunk.size);
         status = fseek(in, tmp_chunk.size, SEEK_CUR);
         assert(!status);
@@ -214,8 +214,8 @@ void riff_write(struct global_context *c, FILE *out) {
     t_chunk tmp_chunk;
     int status;
 
-    /* Output header riff, format wave si chunk date */
-    /* FIXME calcul lungime date */
+    /* Output header riff, format wave si chunk date 头波，输出数据格式RIFF块， */
+    /* FIXME calcul lungime date fixme数据计算长度*/
     status = fwrite(&c->riff_hdr, sizeof(t_riff_hdr), 1, out);
     assert(status);
 
@@ -233,7 +233,7 @@ void riff_write(struct global_context *c, FILE *out) {
 }
 
 void init_fft_maps(struct global_context *c) {
-    /* Pregatire memorie pentru tabele si buffere */
+    /* Pregatire memorie pentru tabele si buffere 工作表和内存缓冲区 */
     c->rev_map = (int *)malloc(c->size * sizeof(int));
     assert(c->rev_map != NULL);
     c->w = (t_complex *)malloc(c->size * sizeof(t_complex));
@@ -266,9 +266,8 @@ void read_eq_cells(struct equalizer_context *c, FILE *in) {
 
 void compute_equalizer_data(struct global_context *c,
         struct equalizer_context *e) {
-    /* Calculeaza amplificarea pentru fiecare componenta spectrala
-       in functie de parametrii egalizatorului din vectorii f, a, q din
-       contextul e
+    /* Calculeaza amplificarea pentru fiecare componenta spectrala in functie de parametrii egalizatorului din vectorii f, a, q din contextul e
+    计算每个组件的光谱放大的egalizatorului取决于参数向量F，Q的背景下
      */
     int i, j;
     double *adb;
@@ -278,19 +277,19 @@ void compute_equalizer_data(struct global_context *c,
     double adbi_k;
 
     adb = alloca(e->ncells * sizeof(double));
-    /* Precalcul amplificare in decibeli pentru fiecare celula */
+    /* Precalcul amplificare in decibeli pentru fiecare celula 在每一个细胞precalcul分贝的放大器 */
     for(i = 0; i < e->ncells; i++)
         adb[i] = 10 * log(e->a[i]) / log10;
-    /* Calcul amplificare pentru fiecare componenta spectrala */
+    /*c */
     for(j = 0; j < c->size; j++) {
         /* Calculez frecventa reala k a componentei j in functie de
-           frecventa de esantionare
+           frecventa de esantionare 真正的频率分量计算J K取决于采样频率
          */
         k = j <= c->size / 2 ?
             (double)j / c->size * c->wave_fmt.samples_per_sec :
             (double)(c->size - j) / c->size * c->wave_fmt.samples_per_sec;
         /* Calculez amplificarea pe componenta j in functie de influenta
-           fiecarei celule
+           fiecarei celule 计算放大组件根据每个细胞的影响[J].
          */
         prod = 1;
         for(i = 0; i < e->ncells; i++) {
@@ -320,7 +319,7 @@ void print_help(char *arg) {
 
 int main(int argc, char **argv) {
     struct global_context c;
-    /* Variabile pentru fluxul de date */
+    /* Variabile pentru fluxul de date 数据流 */
     FILE *in = stdin;
     FILE *out = stdout;
     FILE *noise_file = NULL;
@@ -328,11 +327,11 @@ int main(int argc, char **argv) {
     int frame_cnt = 1, frames;
     t_complex *weight;
 
-    /* Variabile de uz general */
+    /* Variabile de uz general 通用*/
     int status;
     int i, j, k, opt;
 
-    /* Variabile pentru transformarile aplicate */
+    /* Variabile pentru transformarile aplicate 变化的应用 */
     int no_wave_output = 1;
     int do_sample_noise_level = 0;
     t_trans_f trans_f = NULL;
@@ -377,11 +376,11 @@ int main(int argc, char **argv) {
         case 's': /* Sample noise level */
             do_sample_noise_level = 1;
             break;
-        case 'd': /* Dummy run (no transform) */
+        case 'd': /* Dummy run (no transform) 虚拟运行（不改变） */
             trans_f = trans_dummy;
             no_wave_output = 0;
             break;
-        case 'r': /* Perform noise reduction */
+        case 'r': /* Perform noise reduction 执行降噪*/
             if((noise_file = fopen(optarg, "r")) == NULL) {
                 fprintf(stderr, "Failed opening %s\n", optarg);
                 return 17;
@@ -390,7 +389,7 @@ int main(int argc, char **argv) {
             trans_f = trans_noise_reduction;
             trans_ctx = &noise_reduction_context;
             break;
-        case 'e': /* Perform Parametric Equalization */
+        case 'e': /* Perform Parametric Equalization 执行参数均衡 */
             if((eq_file = fopen(optarg, "r")) == NULL) {
                 fprintf(stderr, "Failed opening %s\n", optarg);
                 return 18;
@@ -421,7 +420,7 @@ int main(int argc, char **argv) {
         return status;
 
     if(do_sample_noise_level || trans_f == trans_noise_reduction) {
-        /* Alocare buffere pentru mostrele de zgomot */
+        /* Alocare buffere pentru mostrele de zgomot 分配的缓冲区的噪声样本*/
         noise_reduction_context.noise =
             (long double **)malloc(c.channels * sizeof(long double *));
         assert(noise_reduction_context.noise != NULL);
@@ -431,7 +430,7 @@ int main(int argc, char **argv) {
             assert(noise_reduction_context.noise[i] != NULL);
         }
         /* noise reprezinta o matrice cu componentele spectrale ale
-           zgomotului pentru fiecare canal in parte */
+           zgomotului pentru fiecare canal in parte 噪声是一种噪声谱矩阵为每个通道的组成部分*/
     }
 
     if(do_sample_noise_level) {
@@ -523,7 +522,7 @@ int main(int argc, char **argv) {
     buf_pad = (char *)malloc(c.frame_len / 2);
     assert(buf_pad != NULL);
 
-    /* Initializare tabele */
+    /* Initializare tabele 初始化表*/
     weight_map(c.n, weight);
     init_fft_maps(&c);
 
@@ -533,7 +532,7 @@ int main(int argc, char **argv) {
 
     riff_write(&c, out);
 
-    /* Aplicarea transformarilor.
+    /* Aplicarea transformarilor.transformarilor应用。
 
        Urmatoarele prelucrari se aplica in paralel pe toate canalele
        (pentru ca sunt intretesute in fisierul wave), dar pentru
@@ -552,7 +551,14 @@ int main(int argc, char **argv) {
        Functia join(frame0, frame1) suprapune a 2-a jumatate din primul
        frame peste prima jumatate din al 2-lea frame, folosind functia
        de pondere.
+接下来的接触过筛适用于所有通道并行（因为我在文件intretesute波），但pseudocodul会写简单的单通道。所有的prelucrarile框架在水平平行的渠道。
 
+该算法利用原始缓冲区的尺寸2和N / 2 2（半帧和帧缓冲区（2）在复杂的，2 ^ n）的尺寸。
+
+该算法需要处理一个额外的帧（由0）的开始和结束文件分别，为了缓解前不分别过去2 ^ ／2样品。
+
+
+（frame0 join函数之frame1，2）覆盖了一半的第一在第一个半帧的第二帧，使用函数加权。
        buf0 <- 0;
        read(buf1);
        frame1 <- concat(buf0, buf1);
@@ -595,7 +601,7 @@ int main(int argc, char **argv) {
     }
     while(buf1_len == c.frame_len / 2) {
         if(!(frame_cnt % 10)) {
-            /* De fapt eu numar jumatati de frame-uri */
+            /* De fapt eu numar jumatati de frame-uri 事实上我把一半的帧 */
             fprintf(stderr, "\rFrame %d/%d (%d%%)", frame_cnt / 2, frames,
                     frame_cnt * 50 / frames);
             fflush(stderr);
@@ -663,7 +669,7 @@ int main(int argc, char **argv) {
     fflush(stderr);
 
     
-    /* Eliberare memorie */
+    /* Eliberare memorie 释放内存*/
     if(trans_f == trans_noise_reduction) {
         for(i = 0; i < c.channels; i++)
             free(noise_reduction_context.noise[i]);
