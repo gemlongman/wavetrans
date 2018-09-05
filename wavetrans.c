@@ -124,7 +124,7 @@ int riff_read(struct global_context *c, FILE *in) {
 
     c->wave_len = 0;
 
-    /* Citire header RIFF */
+    /* Citire header RIFF 读取头RIFF*/
     status = fread(&c->riff_hdr, sizeof(t_riff_hdr), 1, in);
     assert(status);
 
@@ -167,7 +167,7 @@ int riff_read(struct global_context *c, FILE *in) {
             fprintf(stderr, "%d channel(s), %d Hz\n", (int)c->wave_fmt.channels,
                     (int)c->wave_fmt.samples_per_sec);
 
-            /* Calcul interleave */
+            /* Calcul interleave 计算交织 */
             c->channels = c->wave_fmt.channels;
             c->bytes_per_sample = c->wave_fmt.bits_per_sample / 8;
             c->interleave = c->channels * c->bytes_per_sample;

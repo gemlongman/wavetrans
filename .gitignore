@@ -1,1 +1,8 @@
 *.o
+*.dat
+*.exe
+.vscode/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+wavetrans

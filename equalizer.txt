@@ -2,10 +2,13 @@
 # Fisierul contine datele care definesc un egalizator parametric.       #
 # Pe fiecare linie se gasesc parametrii unei singure celule de          #
 # egalizare, in urmatoarea ordine: frecventa centrala (Fi), factorul    #
-# de amplificare (Ai) si factorul de calitate (Qi).                     #
+# de amplificare (Ai) si factorul de calitate (Qi).   					#
+# 文件包含的数据定义一个参数均衡器。											#
+# 每行有一个细胞参数：频率均衡，在下一个命令（Fi），放大系数(Ai)和品质因数（Qi）。   	#
 #########################################################################
 
 # Fi       Ai        Qi
   60       0.1       1
   300      1.2       1
   6000     1.8       1
+  144000     0.1		 1
